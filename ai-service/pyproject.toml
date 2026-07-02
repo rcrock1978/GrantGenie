@@ -1,0 +1,92 @@
+[project]
+name = "grantgenie-ai"
+version = "0.1.0"
+description = "GrantGenie AI service: RAG retrieval, multi-model generation, eval gates, and safety checks."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = { text = "Proprietary" }
+authors = [{ name = "GrantGenie Engineering", email = "engineering@grantgenie.example" }]
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "httpx>=0.27.0",
+    "asyncpg>=0.30.0",
+    "pgvector>=0.3.0",
+    "redis>=5.2.0",
+    "openai>=1.54.0",
+    "anthropic>=0.39.0",
+    "tiktoken>=0.8.0",
+    "langchain>=0.3.0",
+    "sentence-transformers>=3.2.0",
+    "FlagEmbedding>=1.2.0",
+    "structlog>=24.4.0",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-instrumentation-httpx>=0.48b0",
+    "opentelemetry-instrumentation-asyncpg>=0.48b0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27.0",
+    "deepeval>=2.0.0",
+]
+
+# Note: ragas (used by T094 eval-gate threshold test) is intentionally NOT in
+# the core dependency set. ragas 0.2.x pins langchain<0.3, while ragas 0.3+ has
+# a langchain_community.chat_models.vertexai import that fails on Python 3.13.
+# T094 will add a `[ragas]` extra in a follow-up commit once an upstream
+# release resolves the conflict. SC-003 (eval-gate threshold) will use
+# deepeval-only checks in the meantime.
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+    "testcontainers[postgres,redis]>=4.8.0",
+    "schemathesis>=3.27.0",
+    "types-requests",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/grantgenie_ai"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ASYNC", "S", "C4", "DTZ", "PIE", "RET", "SIM"]
+ignore = ["S101"]  # allow assert in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S106", "S311"]
+"**/__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: integration tests requiring docker",
+    "eval: eval-gate tests",
+    "safety: prompt-injection / PII tests",
+]
+
+[tool.coverage.run]
+source = ["src/grantgenie_ai"]
+omit = ["*/tests/*", "*/migrations/*"]

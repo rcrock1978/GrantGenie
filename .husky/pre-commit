@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Backend
+cd backend && composer validate --strict --no-check-publish && vendor/bin/pint --test && vendor/bin/phpstan analyse --no-progress --memory-limit=2G || exit 1
+cd ..
+
+# Frontend
+cd frontend && npx --no-install prettier --check . && npx --no-install eslint . --max-warnings 0 || exit 1
+cd ..
+
+# AI service
+cd ai-service && uv run --frozen ruff check . && uv run --frozen mypy src || exit 1
+cd ..

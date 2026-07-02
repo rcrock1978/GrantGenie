@@ -1,0 +1,83 @@
+# Docker ignore patterns for all GrantGenie Dockerfiles
+# (backend/Dockerfile, frontend/Dockerfile, ai-service/Dockerfile, dev docker-compose)
+
+# VCS
+.git/
+.gitignore
+.github/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+
+# Docker meta
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Logs
+*.log
+logs/
+backend/storage/logs/*
+!backend/storage/logs/.gitkeep
+
+# Build artifacts
+backend/vendor/
+backend/node_modules/
+backend/bootstrap/cache/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/public/build
+backend/public/storage
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+frontend/storybook-static/
+ai-service/.venv/
+ai-service/__pycache__/
+**/__pycache__/
+ai-service/.pytest_cache/
+ai-service/.mypy_cache/
+ai-service/.ruff_cache/
+ai-service/htmlcov/
+ai-service/.coverage
+ai-service/dist/
+ai-service/build/
+ai-service/*.egg-info/
+
+# Test / coverage outputs
+coverage/
+*.lcov
+.nyc_output/
+junit.xml
+test-results/
+playwright-report/
+tests/load/results/
+
+# Infrastructure
+infra/.terraform/
+infra/**/*.tfstate*
+infra/**/*.tfplan
+infra/**/terraform.tfvars
+!infra/**/terraform.tfvars.example
+
+# K8s
+*.secret.yaml
+secrets/
+.kube/
+kubeconfig*

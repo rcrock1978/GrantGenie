@@ -1,0 +1,165 @@
+# GrantGenie local development stack
+# Brings up Postgres+pgvector, Redis, MinIO (S3), MailHog (SMTP), the Laravel backend,
+# the Angular dev server, the FastAPI AI service, and observability (Jaeger/Prometheus/Grafana)
+# behind a shared network. See Makefile targets for the per-service commands.
+
+name: grantgenie
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: grantgenie-postgres
+    environment:
+      POSTGRES_USER: grantgenie
+      POSTGRES_PASSWORD: grantgenie
+      POSTGRES_DB: grantgenie
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grantgenie -d grantgenie"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: grantgenie-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: grantgenie-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: grantgenie
+      MINIO_ROOT_PASSWORD: grantgenie-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: grantgenie-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: grantgenie-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: local
+      APP_KEY: ${APP_KEY:-base64:c29tZS1yYW5kb20tMzItYnl0ZS1iYXNlNjQta2V5LWZvci1sb2NhbA==}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: grantgenie
+      DB_USERNAME: grantgenie
+      DB_PASSWORD: grantgenie
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AI_SERVICE_URL: http://ai-service:8001
+      OIDC_ISSUER: ${OIDC_ISSUER:-https://auth.grantgenie.example/}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-grantgenie-api}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/var/www/html
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: grantgenie-frontend
+    depends_on:
+      - backend
+    environment:
+      API_BASE_URL: http://localhost:8000/api/v1
+      OIDC_ISSUER: ${OIDC_ISSUER:-https://auth.grantgenie.example/}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-grantgenie-web}
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend:/app
+    command: ["npx", "ng", "serve", "--host", "0.0.0.0", "--port", "4200"]
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: grantgenie-ai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENV: local
+      DATABASE_URL: postgresql+asyncpg://grantgenie:grantgenie@postgres:5432/grantgenie
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-dev-internal-token}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ai-service:/app
+    command: ["uv", "run", "uvicorn", "grantgenie_ai.api.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: grantgenie-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: grantgenie-prometheus
+    profiles: ["observability"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grantgenie-grafana
+    profiles: ["observability"]
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

@@ -1,0 +1,26 @@
+parameters:
+    level: max
+    paths:
+        - app
+        - config
+        - database
+        - routes
+        - tests
+    excludePaths:
+        - vendor
+        - storage
+        - bootstrap/cache
+        - node_modules
+        - public
+    treatPhpDocTypesAsCertain: false
+    checkMissingIterableValueType: true
+    checkGenericClassInNonGenericObjectType: true
+    reportUnmatchedIgnoredErrors: true
+includes:
+    - vendor/larastan/larastan/extension.neon
+services:
+    -
+        class: PhpStan\Analyser\IgnoreErrorIgnoreListExtension\IgnoreListProvider
+        tags:
+            - phpstan.ignoreListProvider
+customRulesetUsed: true

@@ -1,0 +1,11 @@
+dist
+.angular
+node_modules
+coverage
+package-lock.json
+playwright-report
+test-results
+src/**/*.spec.ts
+e2e/**/*.spec.ts
+*.min.js
+*.min.css
