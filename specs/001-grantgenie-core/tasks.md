@@ -37,16 +37,16 @@ description: "Task list for GrantGenie core implementation"
 
 **Purpose**: Project initialization, monorepo skeleton, and tooling baseline.
 
-- [ ] T001 Create monorepo skeleton (backend/, frontend/, ai-service/, infra/, .github/workflows/, docker-compose.yml, Makefile) at repo root
-- [ ] T002 Initialize Laravel 11 project in backend/ with composer (laravel/laravel ^11.0) and required composer packages (spatie/laravel-permission, lcobucci/jwt, ramsey/uuid, predis/predis, open-telemetry/opentelemetry-php, league/csv, smalot/pdfparser, phpoffice/phpword)
-- [ ] T003 [P] Initialize Angular 18 project in frontend/ with npm (standalone components, Angular Signals, NG-ZORRO UI library, ng-openapi-gen, openid-client-js, monaco-editor, jest, playwright, storybook)
-- [ ] T004 [P] Initialize Python 3.12+ FastAPI project in ai-service/ with uv (fastapi, pydantic v2, langchain, openai, anthropic, tiktoken, pgvector, sentence-transformers, bge-reranker, deepeval, ragas, structlog, opentelemetry-instrumentation-fastapi, pytest, pytest-asyncio, testcontainers, ruff, mypy)
-- [ ] T005 [P] Configure backend linting/formatting/arch-test: phpstan.neon (level: max), laravel-architecture-tester, pint, pest
-- [ ] T006 [P] Configure frontend linting/formatting: eslint, prettier, ng lint config, husky pre-commit hook for backend + frontend + ai-service
-- [ ] T007 [P] Configure AI service linting/formatting: ruff.toml, mypy.ini, pyproject.toml with strict type checking
-- [ ] T008 Create docker-compose.yml with services: postgres (pgvector/pgvector:pg16), redis, minio, mailhog, backend (artisan serve), frontend (ng serve), ai-service (uvicorn), jaeger, prometheus, grafana
-- [ ] T009 Create root Makefile with targets: up, down, test, test-backend, test-frontend, test-ai, test-isolation, e2e-p1, e2e-p2-p3, validate-nfrs, load-test-smoke, eval-gates, finops-report, security-scan, seed-demo, advance-time, deploy-prod
-- [ ] T010 [P] Create root README.md with quickstart, architecture diagram (Mermaid), link to .specify/memory/constitution.md and specs/001-grantgenie-core/
+- [X] T001 Create monorepo skeleton (backend/, frontend/, ai-service/, infra/, .github/workflows/, docker-compose.yml, Makefile) at repo root
+- [X] T002 Initialize Laravel 11 project in backend/ with composer (laravel/laravel ^11.0) and required composer packages (spatie/laravel-permission, lcobucci/jwt, ramsey/uuid, predis/predis, open-telemetry/opentelemetry-php, league/csv, smalot/pdfparser, phpoffice/phpword)
+- [X] T003 [P] Initialize Angular 18 project in frontend/ with npm (standalone components, Angular Signals, NG-ZORRO UI library, ng-openapi-gen, openid-client-js, monaco-editor, jest, playwright, storybook)
+- [X] T004 [P] Initialize Python 3.12+ FastAPI project in ai-service/ with uv (fastapi, pydantic v2, langchain, openai, anthropic, tiktoken, pgvector, sentence-transformers, bge-reranker, deepeval, ragas, structlog, opentelemetry-instrumentation-fastapi, pytest, pytest-asyncio, testcontainers, ruff, mypy)
+- [X] T005 [P] Configure backend linting/formatting/arch-test: phpstan.neon (level: max), laravel-architecture-tester, pint, pest
+- [X] T006 [P] Configure frontend linting/formatting: eslint, prettier, ng lint config, husky pre-commit hook for backend + frontend + ai-service
+- [X] T007 [P] Configure AI service linting/formatting: ruff.toml, mypy.ini, pyproject.toml with strict type checking
+- [X] T008 Create docker-compose.yml with services: postgres (pgvector/pgvector:pg16), redis, minio, mailhog, backend (artisan serve), frontend (ng serve), ai-service (uvicorn), jaeger, prometheus, grafana
+- [X] T009 Create root Makefile with targets: up, down, test, test-backend, test-frontend, test-ai, test-isolation, e2e-p1, e2e-p2-p3, validate-nfrs, load-test-smoke, eval-gates, finops-report, security-scan, seed-demo, advance-time, deploy-prod
+- [X] T010 [P] Create root README.md with quickstart, architecture diagram (Mermaid), link to .specify/memory/constitution.md and specs/001-grantgenie-core/
 
 ---
 
