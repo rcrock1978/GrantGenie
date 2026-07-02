@@ -1,0 +1,88 @@
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Secrets / env ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# --- Backend (Laravel) ---
+backend/vendor/
+backend/node_modules/
+backend/storage/logs/*
+!backend/storage/logs/.gitkeep
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/framework/testing/*
+backend/bootstrap/cache/*
+backend/public/storage
+backend/public/build
+backend/.phpunit.result.cache
+backend/.phpunit.cache
+backend/coverage/
+
+# --- Frontend (Angular) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+frontend/storybook-static/
+
+# --- AI service (Python) ---
+ai-service/.venv/
+ai-service/__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+ai-service/.pytest_cache/
+ai-service/.mypy_cache/
+ai-service/.ruff_cache/
+ai-service/htmlcov/
+ai-service/.coverage
+ai-service/dist/
+ai-service/build/
+ai-service/*.egg-info/
+
+# --- Infra (Terraform) ---
+infra/.terraform/
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/*.tfplan
+infra/**/terraform.tfvars
+!infra/**/terraform.tfvars.example
+
+# --- Docker volumes ---
+docker-data/
+
+# --- Logs / runtime ---
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# --- Build outputs ---
+build/
+dist/
+out/
+target/
+
+# --- k6 / load test results ---
+tests/load/results/
+tests/load/*.json
+!tests/load/*.js
+
+# --- OS / generated ---
+*.bak
+*.tmp
+*.orig

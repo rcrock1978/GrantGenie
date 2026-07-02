@@ -1,0 +1,223 @@
+# AI Service Internal Contract (HTTP/JSON)
+
+**Version**: 1.0
+**Base URL**: `http://ai-service:8001/internal/v1` (k8s) or `http://localhost:8001/internal/v1` (local dev)
+**Auth**: mTLS service mesh OR shared secret header `X-Internal-Auth: <bearer>` (dev only)
+**Consumer**: GrantGenie Laravel backend (sole consumer; not exposed to public API)
+
+## Endpoints
+
+### POST /rag/retrieve
+
+Retrieve the top-k most relevant document chunks for a query, scoped to a tenant.
+
+**Request**:
+```json
+{
+  "account_id": "uuid",
+  "query": "string (≤ 2000 chars)",
+  "top_k": 5,
+  "rerank": true,
+  "filters": {
+    "document_ids": ["uuid", "..."],
+    "min_relevance": 0.5
+  }
+}
+```
+
+**Response 200**:
+```json
+{
+  "chunks": [
+    {
+      "id": "uuid",
+      "document_id": "uuid",
+      "document_title": "Annual Report 2025.pdf",
+      "chunk_index": 12,
+      "page_number": 4,
+      "content": "string",
+      "char_offset_start": 3420,
+      "char_offset_end": 4015,
+      "score": 0.87,
+      "rerank_score": 0.92
+    }
+  ],
+  "embedding_model": "text-embedding-3-small",
+  "rerank_model": "bge-reranker-base",
+  "latency_ms": 142
+}
+```
+
+**Errors**:
+- `400` invalid query
+- `401` missing/invalid auth
+- `429` rate limited (back off and retry)
+- `503` all models exhausted (caller should enqueue)
+
+---
+
+### POST /generate/proposal
+
+Generate a full proposal draft from grant + tenant context.
+
+**Request**:
+```json
+{
+  "account_id": "uuid",
+  "proposal_id": "uuid",
+  "grant": {
+    "id": "uuid",
+    "title": "string",
+    "funder_name": "string",
+    "funder_requirements": { "page_limit": 10, "sections": ["summary", "need", "activities", "budget", "impact"] },
+    "description": "string"
+  },
+  "org_profile": { /* OrgProfile DTO */ },
+  "sections_to_generate": ["summary", "need_statement", "activities", "budget_narrative", "impact"],
+  "model_preference": {
+    "primary": "claude-sonnet-4-5",
+    "fallbacks": ["gpt-4o", "claude-haiku-4-5"]
+  }
+}
+```
+
+**Response 200**:
+```json
+{
+  "sections": [
+    {
+      "kind": "summary",
+      "content": "string",
+      "citations": [
+        { "chunk_id": "uuid", "quote_span_start": 0, "quote_span_end": 240, "confidence": 0.91 }
+      ]
+    }
+  ],
+  "model_used": "claude-sonnet-4-5",
+  "input_tokens": 42150,
+  "output_tokens": 18432,
+  "cost_cents": 178,
+  "latency_ms": 4820,
+  "prompt_injection_blocked": false
+}
+```
+
+**Response 202 (queued)**:
+```json
+{ "job_id": "uuid", "status": "queued", "poll_url": "/generate/proposal/{job_id}" }
+```
+
+**Errors**:
+- `422` eval gate failed (response includes `relevance` and `faithfulness` scores)
+- `429` rate limited
+- `503` all model tiers exhausted
+
+---
+
+### POST /generate/budget-narrative
+
+Generate narrative text for one or more budget line items.
+
+**Request**:
+```json
+{
+  "account_id": "uuid",
+  "proposal_id": "uuid",
+  "items": [
+    { "category": "Personnel", "description": "Program Director (0.5 FTE)", "amount_cents": 6500000 }
+  ],
+  "funder_budget_categories": ["Personnel", "Fringe", "Supplies", "Travel", "Contractual", "Other"]
+}
+```
+
+**Response 200**:
+```json
+{
+  "narratives": [
+    { "category": "Personnel", "narrative": "string" }
+  ],
+  "model_used": "gpt-4o-mini",
+  "input_tokens": 1240,
+  "output_tokens": 380,
+  "cost_cents": 1,
+  "latency_ms": 1820
+}
+```
+
+---
+
+### POST /eval/score
+
+Run eval gates on a draft proposal.
+
+**Request**:
+```json
+{
+  "account_id": "uuid",
+  "proposal_id": "uuid",
+  "sections": [
+    { "kind": "summary", "content": "string", "citations": [{ "chunk_id": "uuid" }] }
+  ]
+}
+```
+
+**Response 200**:
+```json
+{
+  "relevance": 0.89,
+  "faithfulness": 0.93,
+  "passed": true,
+  "thresholds": { "relevance": 0.85, "faithfulness": 0.90 },
+  "failures": []
+}
+```
+
+**Response 200 (failed)**:
+```json
+{
+  "relevance": 0.78,
+  "faithfulness": 0.92,
+  "passed": false,
+  "thresholds": { "relevance": 0.85, "faithfulness": 0.90 },
+  "failures": [
+    { "section": "summary", "issue": "low_relevance", "score": 0.78 }
+  ]
+}
+```
+
+---
+
+### POST /safety/check
+
+Apply prompt-injection defense and PII redaction to AI inputs and outputs.
+
+**Request**:
+```json
+{
+  "input_text": "string",
+  "output_text": "string (optional)",
+  "redact_pii": true
+}
+```
+
+**Response 200**:
+```json
+{
+  "safe_input": "string (sanitized)",
+  "safe_output": "string (redacted)",
+  "injection_detected": false,
+  "pii_redacted": [
+    { "type": "email", "count": 2, "positions": [[120, 145], [310, 340]] }
+  ]
+}
+```
+
+---
+
+### GET /healthz
+
+Liveness probe. Returns `200 {"status":"ok"}` if the process is alive.
+
+### GET /readyz
+
+Readiness probe. Returns `200 {"status":"ready"}` only when DB, Redis, and at least one model provider are reachable.

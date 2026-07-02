@@ -1,0 +1,898 @@
+openapi: 3.1.0
+info:
+  title: GrantGenie Public API
+  version: 1.0.0
+  description: |
+    Multi-tenant grant discovery and AI-assisted proposal drafting for small
+    nonprofits. All endpoints are tenant-scoped via the OIDC JWT `account_id`
+    claim. Cross-tenant access returns 403.
+  contact:
+    name: GrantGenie Engineering
+    email: engineering@grantgenie.example
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.grantgenie.example/api/v1
+    description: Production
+  - url: https://api.staging.grantgenie.example/api/v1
+    description: Staging
+  - url: http://localhost:8000/api/v1
+    description: Local dev
+
+security:
+  - oauth2: []
+
+tags:
+  - name: Auth
+    description: Authentication, session, current user
+  - name: Tenancy
+    description: Tenant management (admin)
+  - name: OrgProfile
+    description: Nonprofit organization profile
+  - name: Boilerplate
+    description: Document library and RAG ingest
+  - name: Discovery
+    description: Grant discovery and eligibility matching
+  - name: Proposals
+    description: Proposal drafting, sections, citations
+  - name: Review
+    description: Reviewer comments and resolution
+  - name: Tracking
+    description: Submissions and deadline reminders
+  - name: Admin
+    description: User and tenant administration
+
+paths:
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated user
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /org-profile:
+    get:
+      tags: [OrgProfile]
+      summary: Get the current tenant's org profile
+      operationId: getOrgProfile
+      responses:
+        '200':
+          description: Org profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrgProfile' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [OrgProfile]
+      summary: Create or replace the org profile
+      operationId: upsertOrgProfile
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrgProfileInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrgProfile' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /boilerplate/documents:
+    get:
+      tags: [Boilerplate]
+      summary: List boilerplate documents for the current tenant
+      operationId: listBoilerplateDocuments
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [uploaded, processing, ready, failed] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BoilerplateDocumentPage' }
+    post:
+      tags: [Boilerplate]
+      summary: Upload a new boilerplate document
+      operationId: uploadBoilerplateDocument
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, title]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title: { type: string, maxLength: 255 }
+      responses:
+        '201':
+          description: Document accepted for processing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BoilerplateDocument' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /boilerplate/documents/{id}:
+    delete:
+      tags: [Boilerplate]
+      summary: Delete a boilerplate document and its chunks
+      operationId: deleteBoilerplateDocument
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /discovery/search:
+    post:
+      tags: [Discovery]
+      summary: Search the grant corpus with eligibility filtering
+      operationId: searchGrants
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GrantSearchInput' }
+      responses:
+        '200':
+          description: Paginated grant results, all marked eligible
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GrantPage' }
+        '412': { $ref: '#/components/responses/PreconditionFailedProfile' }
+
+  /discovery/grants/{id}:
+    get:
+      tags: [Discovery]
+      summary: Get a grant by id
+      operationId: getGrant
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Grant with current eligibility decision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GrantWithEligibility' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /proposals:
+    get:
+      tags: [Proposals]
+      summary: List proposals for the current tenant
+      operationId: listProposals
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/ProposalStatus' }
+        - in: query
+          name: grantId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProposalPage' }
+    post:
+      tags: [Proposals]
+      summary: Create a new proposal for a grant
+      operationId: createProposal
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProposalCreateInput' }
+      responses:
+        '201':
+          description: Created (in drafting status)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Proposal' }
+        '412': { $ref: '#/components/responses/PreconditionFailedProfile' }
+
+  /proposals/{id}:
+    get:
+      tags: [Proposals]
+      summary: Get a proposal with sections
+      operationId: getProposal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Proposal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProposalDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Proposals]
+      summary: Archive a proposal
+      operationId: archiveProposal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Archived }
+
+  /proposals/{id}/draft:
+    post:
+      tags: [Proposals]
+      summary: Trigger AI draft generation (or re-draft) for a proposal
+      description: |
+        Calls the AI service with RAG context from the tenant's boilerplate
+        documents and the grant's funder requirements. Streams progress as
+        server-sent events. Eval gates (relevance ≥ 0.85, faithfulness ≥ 0.90)
+        must pass before the proposal can transition to ready_for_review.
+      operationId: draftProposal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Drafted proposal with citations
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProposalDetail' }
+        '422': { $ref: '#/components/responses/EvalGateFailed' }
+        '503': { $ref: '#/components/responses/AIServiceUnavailable' }
+
+  /proposals/{id}/lock:
+    post:
+      tags: [Proposals]
+      summary: Acquire an edit lock on a proposal
+      operationId: acquireEditLock
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Lock acquired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EditLock' }
+        '409': { $ref: '#/components/responses/LockHeld' }
+    delete:
+      tags: [Proposals]
+      summary: Release the edit lock
+      operationId: releaseEditLock
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Released }
+
+  /proposals/{id}/sections/{sid}:
+    patch:
+      tags: [Proposals]
+      summary: Update a proposal section (requires edit lock)
+      operationId: updateProposalSection
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: sid
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SectionUpdateInput' }
+      responses:
+        '200':
+          description: Updated section
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProposalSection' }
+        '423': { $ref: '#/components/responses/Locked' }
+
+  /proposals/{id}/status:
+    post:
+      tags: [Proposals]
+      summary: Transition proposal status
+      operationId: transitionProposalStatus
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProposalStatusInput' }
+      responses:
+        '200':
+          description: New status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Proposal' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /proposals/{id}/comments:
+    get:
+      tags: [Review]
+      summary: List review comments for a proposal
+      operationId: listReviewComments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: sectionId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, resolved] }
+      responses:
+        '200':
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReviewComment' }
+    post:
+      tags: [Review]
+      summary: Add a review comment
+      operationId: addReviewComment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewCommentInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewComment' }
+
+  /proposals/{id}/comments/{cid}/resolve:
+    post:
+      tags: [Review]
+      summary: Mark a comment resolved
+      operationId: resolveReviewComment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: cid
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Resolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewComment' }
+
+  /tracking/submissions:
+    get:
+      tags: [Tracking]
+      summary: List submissions
+      operationId: listSubmissions
+      responses:
+        '200':
+          description: Submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Submission' }
+    post:
+      tags: [Tracking]
+      summary: Record a submission (manually or auto from approved proposal)
+      operationId: createSubmission
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmissionInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+
+  /tracking/notifications:
+    get:
+      tags: [Tracking]
+      summary: List current user's notifications
+      operationId: listNotifications
+      parameters:
+        - in: query
+          name: unreadOnly
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List tenant users
+      operationId: listTenantUsers
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+    post:
+      tags: [Admin]
+      summary: Invite a new user
+      operationId: inviteUser
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InviteUserInput' }
+      responses:
+        '201':
+          description: Invited
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+
+  /admin/users/{id}/roles:
+    put:
+      tags: [Admin]
+      summary: Set a user's roles
+      operationId: setUserRoles
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetRolesInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.grantgenie.example/authorize
+          tokenUrl: https://auth.grantgenie.example/oauth/token
+          refreshUrl: https://auth.grantgenie.example/oauth/token
+          scopes:
+            openid: OpenID Connect scope
+            profile: User profile
+            email: Email address
+
+  parameters:
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: { type: string, format: uuid }
+      description: Client-supplied UUID. Replaying the same key + request body within 24h returns the cached response.
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    NotFound:
+      description: Resource not found
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    ValidationError:
+      description: Validation failed
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    PayloadTooLarge:
+      description: File exceeds 10 MB
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    UnsupportedMediaType:
+      description: File format not supported (allowed: PDF, DOCX, TXT, MD)
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Locked:
+      description: Another user holds the edit lock
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    LockHeld:
+      description: Proposal already locked by another user
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    EvalGateFailed:
+      description: AI eval thresholds not met (relevance < 0.85 or faithfulness < 0.90)
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    AIServiceUnavailable:
+      description: AI service exhausted retries; request is queued
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    PreconditionFailedProfile:
+      description: Org profile is incomplete; complete it first
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        correlation_id: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        roles: { type: array, items: { $ref: '#/components/schemas/Role' } }
+        status: { type: string, enum: [active, invited, disabled] }
+        last_login_at: { type: string, format: date-time, nullable: true }
+
+    Role:
+      type: string
+      enum: [admin, writer, reviewer, viewer]
+
+    InviteUserInput:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+
+    SetRolesInput:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+
+    OrgProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mission: { type: string }
+        history: { type: string, nullable: true }
+        programs:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              description: { type: string }
+              served_annually: { type: integer, nullable: true }
+        service_area_states:
+          type: array
+          items: { type: string, minLength: 2, maxLength: 2 }
+        ntee_codes:
+          type: array
+          items: { type: string }
+        organization_type: { type: string }
+        annual_budget_cents: { type: integer, nullable: true }
+        years_operating: { type: integer, nullable: true }
+        contact_email: { type: string, format: email }
+        website_url: { type: string, format: uri, nullable: true }
+        completed: { type: boolean }
+        updated_at: { type: string, format: date-time }
+
+    OrgProfileInput:
+      type: object
+      required: [mission, programs, service_area_states, ntee_codes, organization_type, contact_email]
+      properties:
+        mission: { type: string, minLength: 50 }
+        history: { type: string }
+        programs:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [name, description]
+            properties:
+              name: { type: string }
+              description: { type: string }
+              served_annually: { type: integer }
+        service_area_states:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 2, maxLength: 2 }
+        ntee_codes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        organization_type: { type: string }
+        annual_budget_cents: { type: integer }
+        years_operating: { type: integer }
+        contact_email: { type: string, format: email }
+        website_url: { type: string, format: uri }
+
+    BoilerplateDocument:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        original_filename: { type: string }
+        format: { type: string, enum: [pdf, docx, txt, md] }
+        size_bytes: { type: integer }
+        status: { type: string, enum: [uploaded, processing, ready, failed] }
+        chunk_count: { type: integer }
+        processing_error: { type: string, nullable: true }
+        uploaded_at: { type: string, format: date-time }
+
+    BoilerplateDocumentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BoilerplateDocument' }
+        next_cursor: { type: string, nullable: true }
+
+    GrantSearchInput:
+      type: object
+      properties:
+        query: { type: string, description: Free-text query }
+        categories: { type: array, items: { type: string } }
+        amount_min_cents: { type: integer }
+        amount_max_cents: { type: integer }
+        deadline_within_days: { type: integer }
+        limit: { type: integer, default: 50, maximum: 200 }
+        cursor: { type: string }
+
+    Grant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        funder_name: { type: string }
+        funder_url: { type: string, nullable: true }
+        description: { type: string }
+        amount_min_cents: { type: integer, nullable: true }
+        amount_max_cents: { type: integer, nullable: true }
+        deadline_at: { type: string, format: date-time, nullable: true }
+        categories: { type: array, items: { type: string } }
+        service_area_states: { type: array, items: { type: string } }
+        status: { type: string, enum: [open, closed, forecasted] }
+        last_ingested_at: { type: string, format: date-time }
+
+    GrantWithEligibility:
+      allOf:
+        - $ref: '#/components/schemas/Grant'
+        - type: object
+          properties:
+            eligibility:
+              type: object
+              properties:
+                result: { type: string, enum: [eligible, not_eligible] }
+                matched_rule_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                evaluated_at: { type: string, format: date-time }
+
+    GrantPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Grant' }
+        next_cursor: { type: string, nullable: true }
+        corpus_last_refreshed_at: { type: string, format: date-time }
+
+    ProposalStatus:
+      type: string
+      enum: [drafting, ready_for_review, in_review, approved, submitted, archived]
+
+    Proposal:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        grant_id: { type: string, format: uuid }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/ProposalStatus' }
+        ai_model_used: { type: string, nullable: true }
+        ai_total_input_tokens: { type: integer }
+        ai_total_output_tokens: { type: integer }
+        ai_total_cost_cents: { type: integer }
+        eval_relevance: { type: number, nullable: true }
+        eval_faithfulness: { type: number, nullable: true }
+        eval_passed: { type: boolean, nullable: true }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProposalDetail:
+      allOf:
+        - $ref: '#/components/schemas/Proposal'
+        - type: object
+          properties:
+            sections:
+              type: array
+              items: { $ref: '#/components/schemas/ProposalSection' }
+            grant: { $ref: '#/components/schemas/Grant' }
+
+    ProposalPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Proposal' }
+        next_cursor: { type: string, nullable: true }
+
+    ProposalCreateInput:
+      type: object
+      required: [grant_id, title]
+      properties:
+        grant_id: { type: string, format: uuid }
+        title: { type: string, maxLength: 512 }
+
+    ProposalStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/ProposalStatus' }
+
+    ProposalSection:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        proposal_id: { type: string, format: uuid }
+        kind: { type: string, enum: [summary, need_statement, activities, budget_narrative, impact] }
+        order_index: { type: integer }
+        content: { type: string }
+        updated_by: { type: string, format: uuid, nullable: true }
+        updated_at: { type: string, format: date-time }
+
+    SectionUpdateInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1 }
+
+    EditLock:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        proposal_id: { type: string, format: uuid }
+        holder_user_id: { type: string, format: uuid }
+        acquired_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+
+    ReviewComment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        section_id: { type: string, format: uuid }
+        author_id: { type: string, format: uuid }
+        author_display_name: { type: string }
+        body: { type: string }
+        anchor_quote: { type: string, nullable: true }
+        anchor_quote_start: { type: integer, nullable: true }
+        anchor_quote_end: { type: integer, nullable: true }
+        status: { type: string, enum: [open, resolved] }
+        resolved_by: { type: string, format: uuid, nullable: true }
+        resolved_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    ReviewCommentInput:
+      type: object
+      required: [section_id, body]
+      properties:
+        section_id: { type: string, format: uuid }
+        body: { type: string, minLength: 1, maxLength: 4000 }
+        anchor_quote: { type: string }
+        anchor_quote_start: { type: integer }
+        anchor_quote_end: { type: integer }
+
+    Submission:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        proposal_id: { type: string, format: uuid }
+        funder_name: { type: string }
+        submitted_at: { type: string, format: date-time }
+        funder_confirmation_id: { type: string, nullable: true }
+        status: { type: string, enum: [submitted, under_review, awarded, declined, withdrawn] }
+        awarded_amount_cents: { type: integer, nullable: true }
+        outcome_notes: { type: string, nullable: true }
+
+    SubmissionInput:
+      type: object
+      required: [proposal_id, funder_name, submitted_at]
+      properties:
+        proposal_id: { type: string, format: uuid }
+        funder_name: { type: string }
+        submitted_at: { type: string, format: date-time }
+        funder_confirmation_id: { type: string }
+        status: { type: string, enum: [submitted, under_review, awarded, declined, withdrawn] }
+        awarded_amount_cents: { type: integer }
+        outcome_notes: { type: string }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [deadline_reminder, review_request, comment_reply, system] }
+        title: { type: string }
+        body: { type: string }
+        link_url: { type: string, nullable: true }
+        read_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
