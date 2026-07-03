@@ -1,0 +1,36 @@
+name: eval-gates
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: grantgenie
+          POSTGRES_PASSWORD: grantgenie
+          POSTGRES_DB: grantgenie
+        ports: ['5432:5432']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install uv
+      - run: cd ai-service && uv sync --frozen
+      - name: Run SC-003 eval-gate threshold (relevance ≥ 0.85, faithfulness ≥ 0.90)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: cd ai-service && uv run --frozen pytest -m eval --maxfail=1
+      - name: Upload eval dataset drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-drift-report
+          path: ai-service/reports/eval-drift-*.json

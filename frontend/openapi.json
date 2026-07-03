@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cyclosproject/ng-openapi-gen/master/ng-openapi-gen-schema.json",
+  "openapi": "../specs/001-grantgenie-core/contracts/api-openapi.yaml",
+  "output": "src/app/core/api",
+  "module": "ApiModule",
+  "rootUrl": "API_BASE_URL",
+  "ignoreUnusedModels": false,
+  "defaultTag": "Api"
+}

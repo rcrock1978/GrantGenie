@@ -67,6 +67,7 @@ ignore = ["S101"]  # allow assert in tests
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S106", "S311"]
 "**/__init__.py" = ["F401"]
+"src/**/config.py" = ["S105"]  # dev defaults are documented; real secrets come from env
 
 [tool.mypy]
 python_version = "3.12"

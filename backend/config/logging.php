@@ -1,132 +1,89 @@
 <?php
 
-use Monolog\Handler\NullHandler;
-use Monolog\Handler\StreamHandler;
-use Monolog\Handler\SyslogUdpHandler;
-use Monolog\Processor\PsrLogMessageProcessor;
+declare(strict_types=1);
+
+use App\Http\Middleware\CorrelationIdMiddleware;
+use Monolog\Handler\RotatingFileHandler;
+use Monolog\Logger;
+
+/*
+|--------------------------------------------------------------------------
+| Logging Configuration (T024)
+|--------------------------------------------------------------------------
+|
+| Implements FR-015 + SC-006 + Constitution Principle V.
+|  - Structured JSON to storage/logs/laravel-YYYY-MM-DD.json
+|  - Daily rotation (Monolog RotatingFileHandler, 30-day retention)
+|  - Every log line includes correlation_id, account_id, user_id when present
+|  - Error channel separate for ops alerting
+|
+*/
 
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default Log Channel
-    |--------------------------------------------------------------------------
-    |
-    | This option defines the default log channel that is utilized to write
-    | messages to your logs. The value provided here should match one of
-    | the channels present in the list of "channels" configured below.
-    |
-    */
-
-    'default' => env('LOG_CHANNEL', 'stack'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Deprecations Log Channel
-    |--------------------------------------------------------------------------
-    |
-    | This option controls the log channel that should be used to log warnings
-    | regarding deprecated PHP and library features. This allows you to get
-    | your application ready for upcoming major versions of dependencies.
-    |
-    */
+    'default' => env('LOG_CHANNEL', 'structured'),
 
     'deprecations' => [
         'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
         'trace' => env('LOG_DEPRECATIONS_TRACE', false),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Log Channels
-    |--------------------------------------------------------------------------
-    |
-    | Here you may configure the log channels for your application. Laravel
-    | utilizes the Monolog PHP logging library, which includes a variety
-    | of powerful log handlers and formatters that you're free to use.
-    |
-    | Available drivers: "single", "daily", "slack", "syslog",
-    |                    "errorlog", "monolog", "custom", "stack"
-    |
-    */
-
     'channels' => [
-
-        'stack' => [
-            'driver' => 'stack',
-            'channels' => explode(',', env('LOG_STACK', 'single')),
-            'ignore_exceptions' => false,
-        ],
-
-        'single' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
-        'daily' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_DAILY_DAYS', 14),
-            'replace_placeholders' => true,
-        ],
-
-        'slack' => [
-            'driver' => 'slack',
-            'url' => env('LOG_SLACK_WEBHOOK_URL'),
-            'username' => env('LOG_SLACK_USERNAME', 'Laravel Log'),
-            'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
-            'level' => env('LOG_LEVEL', 'critical'),
-            'replace_placeholders' => true,
-        ],
-
-        'papertrail' => [
+        'structured' => [
             'driver' => 'monolog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'handler' => env('LOG_PAPERTRAIL_HANDLER', SyslogUdpHandler::class),
-            'handler_with' => [
-                'host' => env('PAPERTRAIL_URL'),
-                'port' => env('PAPERTRAIL_PORT'),
-                'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'handler' => RotatingFileHandler::class,
+            'with' => [
+                'filename' => storage_path('logs/laravel.log'),
+                'maxFiles' => env('LOG_MAX_FILES', 30),
             ],
-            'processors' => [PsrLogMessageProcessor::class],
+            'formatter' => Monolog\Formatter\JsonFormatter::class,
+            'formatter_with' => [
+                'batchMode' => Monolog\Formatter\JsonFormatter::BATCH_MODE_NEWLINES,
+                'appendNewline' => true,
+                'includeStacktraces' => true,
+            ],
+            'processors' => [
+                App\Logging\InjectContextProcessor::class,
+            ],
+        ],
+
+        'error' => [
+            'driver' => 'monolog',
+            'level' => 'error',
+            'handler' => RotatingFileHandler::class,
+            'with' => [
+                'filename' => storage_path('logs/error.log'),
+                'maxFiles' => env('LOG_MAX_FILES', 30),
+            ],
+            'formatter' => Monolog\Formatter\JsonFormatter::class,
+            'processors' => [
+                App\Logging\InjectContextProcessor::class,
+            ],
+        ],
+
+        'audit' => [
+            'driver' => 'monolog',
+            'level' => 'info',
+            'handler' => Monolog\Handler\StreamHandler::class,
+            'with' => [
+                'stream' => storage_path('logs/audit.log'),
+            ],
+            'formatter' => Monolog\Formatter\JsonFormatter::class,
+            'processors' => [
+                App\Logging\InjectContextProcessor::class,
+            ],
         ],
 
         'stderr' => [
             'driver' => 'monolog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'handler' => StreamHandler::class,
-            'formatter' => env('LOG_STDERR_FORMATTER'),
-            'with' => [
-                'stream' => 'php://stderr',
-            ],
-            'processors' => [PsrLogMessageProcessor::class],
+            'level' => env('LOG_LEVEL', 'info'),
+            'handler' => Monolog\Handler\StreamHandler::class,
+            'with' => ['stream' => 'php://stderr'],
+            'formatter' => env('LOG_STDERR_FORMATTER') === 'json'
+                ? Monolog\Formatter\JsonFormatter::class
+                : Monolog\Formatter\LineFormatter::class,
         ],
 
-        'syslog' => [
-            'driver' => 'syslog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'facility' => env('LOG_SYSLOG_FACILITY', LOG_USER),
-            'replace_placeholders' => true,
-        ],
-
-        'errorlog' => [
-            'driver' => 'errorlog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
-        'null' => [
-            'driver' => 'monolog',
-            'handler' => NullHandler::class,
-        ],
-
-        'emergency' => [
-            'path' => storage_path('logs/laravel.log'),
-        ],
-
+        'null' => ['driver' => 'monolog', 'handler' => Monolog\Handler\NullHandler::class],
     ],
-
 ];

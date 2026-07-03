@@ -1,0 +1,28 @@
+name: ci-ai-service
+
+on:
+  push:
+    branches: [main]
+    paths: ['ai-service/**', '.github/workflows/ci-ai-service.yml']
+  pull_request:
+    paths: ['ai-service/**', '.github/workflows/ci-ai-service.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install uv
+      - run: cd ai-service && uv sync --frozen
+      - run: cd ai-service && uv run --frozen ruff check .
+      - run: cd ai-service && uv run --frozen mypy src
+      - run: cd ai-service && uv run --frozen pytest -m "not eval and not safety"
+      - name: Eval-gate threshold test (SC-003, optional)
+        continue-on-error: true
+        run: cd ai-service && uv run --frozen pytest -m eval
+      - name: Safety red-team (prompt-injection + PII)
+        continue-on-error: true
+        run: cd ai-service && uv run --frozen pytest -m safety

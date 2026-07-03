@@ -1,0 +1,67 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'frontend/**', 'ai-service/**', 'infra/**', '.github/workflows/security.yml']
+  pull_request:
+    paths: ['backend/**', 'frontend/**', 'ai-service/**', 'infra/**', '.github/workflows/security.yml']
+
+permissions:
+  contents: read
+  pull-requests: write  # for GHPRB-style security advisories
+  security-events: write
+
+jobs:
+  sast-semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep SAST
+        run: semgrep ci --config p/php --config p/owasp-top-ten --error
+
+  sca-trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: sarif
+          output: trivy-fs.sarif
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+
+  image-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy Dockerfiles scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: backend/Dockerfile
+          scan-ref: frontend/Dockerfile
+          scan-ref: ai-service/Dockerfile
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+
+  secrets-gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks detect
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
