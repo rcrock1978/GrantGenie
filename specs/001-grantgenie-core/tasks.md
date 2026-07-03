@@ -56,34 +56,34 @@ description: "Task list for GrantGenie core implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T011 Create pgvector extension migration: backend/database/migrations/2026_07_03_000001_create_pgvector_extension.php
-- [ ] T012 [P] Create accounts, users, roles, user_roles migrations with RLS policies in backend/database/migrations/
-- [ ] T013 [P] Create org_profiles migration with RLS in backend/database/migrations/
-- [ ] T014 [P] Create grants, eligibility_decisions, ingestion_sources, ingestion_runs migrations with RLS in backend/database/migrations/
-- [ ] T015 [P] Create boilerplate_documents, document_chunks (with HNSW index) migrations with RLS in backend/database/migrations/
-- [ ] T016 [P] Create proposals, proposal_sections, proposal_section_versions, citations, review_comments, edit_locks, budget_items migrations with RLS in backend/database/migrations/
-- [ ] T017 [P] Create submissions, notifications, deadline_reminders, audit_logs (immutable, incl. Postgres trigger blocking UPDATE/DELETE on audit_logs), outbox_messages, idempotency_keys migrations with RLS in backend/database/migrations/
-- [ ] T018 Implement TenantScope middleware in backend/app/Http/Middleware/TenantScope.php (sets `app.current_tenant_id` Postgres session var from JWT, asserts user account_id match)
-- [ ] T019 [P] Implement IdempotencyKey middleware in backend/app/Http/Middleware/IdempotencyKey.php (24h Redis-backed key store; replays cached response)
-- [ ] T020 [P] Implement CorrelationIdMiddleware in backend/app/Http/Middleware/CorrelationIdMiddleware.php (generates/propagates X-Correlation-Id; injects into logs and outbox events)
-- [ ] T021 [P] Implement ProblemDetailsHandler in backend/app/Exceptions/Handler.php (RFC 7807 application/problem+json responses with correlation_id)
-- [ ] T022 [P] Configure OIDC JWT auth in backend/config/auth.php + backend/app/Http/Middleware/VerifyOidcToken.php (RS256, Auth0-issued)
-- [ ] T023 [P] Configure spatie/laravel-permission roles (admin/writer/reviewer/viewer) in backend/database/seeders/RoleSeeder.php
-- [ ] T024 [P] Configure monolog JSON logging in backend/config/logging.php with daily rotation to backend/storage/logs/$(date +%F).json
-- [ ] T025 [P] Configure OpenTelemetry SDK in backend/ (auto-instrumentation for Laravel + Eloquent + Redis + HTTP) with OTLP exporter
-- [ ] T026 [P] Configure OpenTelemetry in ai-service/src/grantgenie_ai/core/telemetry.py (FastAPI + httpx + asyncpg auto-instrumentation)
-- [ ] T027 [P] Configure structured logging in ai-service/src/grantgenie_ai/core/logging.py (structlog, JSON output, correlation_id)
-- [ ] T028 [P] Configure OutboxPublisher Laravel command in backend/app/Console/Commands/PublishOutboxCommand.php (reads pending outbox_messages, publishes to Redis Stream grantgenie.events with retries and exponential backoff)
-- [ ] T029 [P] Implement AIServiceClient HTTP adapter in backend/app/Infrastructure/External/AIServiceClient.php (calls ai-service/internal/v1/...; internal mTLS or shared secret auth; maps errors to ProblemDetails)
-- [ ] T030 [P] Implement EventPublisher in backend/app/Infrastructure/Messaging/EventPublisher.php (writes events to outbox_messages in same DB transaction as state change)
-- [ ] T031 [P] Set up Redis-backed rate limiter, query cache, and edit-lock manager in backend/app/Infrastructure/Cache/
-- [ ] T032 [P] Set up object storage adapter in backend/app/Infrastructure/Storage/DocumentStorage.php (S3-compatible, MinIO in dev, Azure Blob in prod)
-- [ ] T033 [P] Implement RBAC policy tests in backend/tests/Architecture/ (PHPStan + Laravel architecture tests enforcing: App\Domain\* has no Illuminate\*, no App\Infrastructure\*; App\Application\* depends only on App\Domain\*; controllers in App\Infrastructure\Http\ depend on Application ports not Domain concrete classes)
-- [ ] T034 [P] Implement multi-tenant RLS isolation test suite in backend/tests/Integration/Isolation/ (creates 2 tenants, proves cross-tenant reads return 0 rows across all tables; runs in CI as the SC-005 gate)
-- [ ] T035 [P] Configure GitHub Actions CI workflows at .github/workflows/ci-backend.yml, ci-frontend.yml, ci-ai-service.yml, eval-gates.yml, deploy.yml, security.yml (SAST: semgrep, SCA: snyk/trivy, secret scan: gitleaks; required by constitution Governance §4 step 5 before any PR merge)
-- [ ] T036 [P] Generate Angular typed API client from contracts/api-openapi.yaml in frontend/src/app/core/api/ (using ng-openapi-gen)
-- [ ] T037 [P] Implement core Angular infrastructure: AuthInterceptor, OidcAuthService, TenantContextService, ApiClient wrapper, AppShell layout, route guards (authGuard, roleGuard) in frontend/src/app/core/
-- [ ] T038 [P] Implement ai-service FastAPI app skeleton: main.py, config (pydantic-settings), /healthz, /readyz, dependency injection wiring, ai-service/src/grantgenie_ai/api/router.py
+- [X] T011 Create pgvector extension migration: backend/database/migrations/2026_07_03_000001_create_pgvector_extension.php
+- [X] T012 [P] Create accounts, users, roles, user_roles migrations with RLS policies in backend/database/migrations/
+- [X] T013 [P] Create org_profiles migration with RLS in backend/database/migrations/
+- [X] T014 [P] Create grants, eligibility_decisions, ingestion_sources, ingestion_runs migrations with RLS in backend/database/migrations/
+- [X] T015 [P] Create boilerplate_documents, document_chunks (with HNSW index) migrations with RLS in backend/database/migrations/
+- [X] T016 [P] Create proposals, proposal_sections, proposal_section_versions, citations, review_comments, edit_locks, budget_items migrations with RLS in backend/database/migrations/
+- [X] T017 [P] Create submissions, notifications, deadline_reminders, audit_logs (immutable, incl. Postgres trigger blocking UPDATE/DELETE on audit_logs), outbox_messages, idempotency_keys migrations with RLS in backend/database/migrations/
+- [X] T018 Implement TenantScope middleware in backend/app/Http/Middleware/TenantScope.php (sets `app.current_tenant_id` Postgres session var from JWT, asserts user account_id match)
+- [X] T019 [P] Implement IdempotencyKey middleware in backend/app/Http/Middleware/IdempotencyKey.php (24h Redis-backed key store; replays cached response)
+- [X] T020 [P] Implement CorrelationIdMiddleware in backend/app/Http/Middleware/CorrelationIdMiddleware.php (generates/propagates X-Correlation-Id; injects into logs and outbox events)
+- [X] T021 [P] Implement ProblemDetailsHandler in backend/app/Exceptions/Handler.php (RFC 7807 application/problem+json responses with correlation_id)
+- [X] T022 [P] Configure OIDC JWT auth in backend/config/auth.php + backend/app/Http/Middleware/VerifyOidcToken.php (RS256, Auth0-issued)
+- [X] T023 [P] Configure spatie/laravel-permission roles (admin/writer/reviewer/viewer) in backend/database/seeders/RoleSeeder.php
+- [X] T024 [P] Configure monolog JSON logging in backend/config/logging.php with daily rotation to backend/storage/logs/$(date +%F).json
+- [X] T025 [P] Configure OpenTelemetry SDK in backend/ (auto-instrumentation for Laravel + Eloquent + Redis + HTTP) with OTLP exporter
+- [X] T026 [P] Configure OpenTelemetry in ai-service/src/grantgenie_ai/core/telemetry.py (FastAPI + httpx + asyncpg auto-instrumentation)
+- [X] T027 [P] Configure structured logging in ai-service/src/grantgenie_ai/core/logging.py (structlog, JSON output, correlation_id)
+- [X] T028 [P] Configure OutboxPublisher Laravel command in backend/app/Console/Commands/PublishOutboxCommand.php (reads pending outbox_messages, publishes to Redis Stream grantgenie.events with retries and exponential backoff)
+- [X] T029 [P] Implement AIServiceClient HTTP adapter in backend/app/Infrastructure/External/AIServiceClient.php (calls ai-service/internal/v1/...; internal mTLS or shared secret auth; maps errors to ProblemDetails)
+- [X] T030 [P] Implement EventPublisher in backend/app/Infrastructure/Messaging/EventPublisher.php (writes events to outbox_messages in same DB transaction as state change)
+- [X] T031 [P] Set up Redis-backed rate limiter, query cache, and edit-lock manager in backend/app/Infrastructure/Cache/
+- [X] T032 [P] Set up object storage adapter in backend/app/Infrastructure/Storage/DocumentStorage.php (S3-compatible, MinIO in dev, Azure Blob in prod)
+- [X] T033 [P] Implement RBAC policy tests in backend/tests/Architecture/ (PHPStan + Laravel architecture tests enforcing: App\Domain\* has no Illuminate\*, no App\Infrastructure\*; App\Application\* depends only on App\Domain\*; controllers in App\Infrastructure\Http\ depend on Application ports not Domain concrete classes)
+- [X] T034 [P] Implement multi-tenant RLS isolation test suite in backend/tests/Integration/Isolation/ (creates 2 tenants, proves cross-tenant reads return 0 rows across all tables; runs in CI as the SC-005 gate)
+- [X] T035 [P] Configure GitHub Actions CI workflows at .github/workflows/ci-backend.yml, ci-frontend.yml, ci-ai-service.yml, eval-gates.yml, deploy.yml, security.yml (SAST: semgrep, SCA: snyk/trivy, secret scan: gitleaks; required by constitution Governance §4 step 5 before any PR merge)
+- [X] T036 [P] Generate Angular typed API client from contracts/api-openapi.yaml in frontend/src/app/core/api/ (using ng-openapi-gen)
+- [X] T037 [P] Implement core Angular infrastructure: AuthInterceptor, OidcAuthService, TenantContextService, ApiClient wrapper, AppShell layout, route guards (authGuard, roleGuard) in frontend/src/app/core/
+- [X] T038 [P] Implement ai-service FastAPI app skeleton: main.py, config (pydantic-settings), /healthz, /readyz, dependency injection wiring, ai-service/src/grantgenie_ai/api/router.py
 
 **Checkpoint**: Foundation ready — user story implementation can now begin in parallel.
 
