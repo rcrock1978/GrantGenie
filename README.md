@@ -93,3 +93,4 @@ make validate-nfrs # SC-001/002/003/005/006/007 all measured
 ## Governance
 
 Spec-first development, Clean Architecture, TDD with AI eval gates, multi-tenant isolation by construction, observability and cost awareness. Amendments to the constitution require a documented ADR per `.specify/memory/constitution.md` Governance §3.
+# GrantGenie
